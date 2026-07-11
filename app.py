@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,16 +27,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.5")
 OPENAI_VECTOR_STORE_ID = os.getenv("OPENAI_VECTOR_STORE_ID")
 
-if not OPENAI_API_KEY:
-    logger.warning(
-        "La variable OPENAI_API_KEY no está configurada."
-    )
-
-if not OPENAI_VECTOR_STORE_ID:
-    logger.warning(
-        "La variable OPENAI_VECTOR_STORE_ID no está configurada."
-    )
-
 client = (
     OpenAI(api_key=OPENAI_API_KEY)
     if OPENAI_API_KEY
@@ -44,16 +35,13 @@ client = (
 
 
 # ---------------------------------------------------------
-# APLICACIÓN FASTAPI
+# APLICACIÓN
 # ---------------------------------------------------------
 
 app = FastAPI(
     title="Profesora IA EIEB",
-    description=(
-        "Asistente pedagógico de la Escuela Iberoamericana "
-        "de Estética y Bienestar."
-    ),
-    version="0.4.0",
+    description="Asistente pedagógico de EIEB.",
+    version="0.5.0",
 )
 
 app.add_middleware(
@@ -72,82 +60,97 @@ app.mount(
 
 
 # ---------------------------------------------------------
-# MODELOS DE DATOS
+# MODELOS
 # ---------------------------------------------------------
+
+class HistoryMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(
+        ...,
+        min_length=1,
+        max_length=8000,
+    )
+
 
 class ChatRequest(BaseModel):
     message: str = Field(
         ...,
         min_length=1,
         max_length=4000,
-        description="Pregunta pedagógica realizada por la alumna.",
-        examples=["¿Qué es la reflexología podal?"],
     )
 
-    previous_response_id: str | None = Field(
-        default=None,
-        description=(
-            "Identificador de la respuesta anterior para "
-            "mantener el contexto de la conversación."
-        ),
+    history: list[HistoryMessage] = Field(
+        default_factory=list,
+        description="Últimos mensajes de la conversación.",
     )
 
 
 class ChatResponse(BaseModel):
     answer: str
     model: str
-    response_id: str
 
 
 # ---------------------------------------------------------
-# INSTRUCCIONES DE LA PROFESORA
+# PROMPT
 # ---------------------------------------------------------
 
 SYSTEM_PROMPT = """
 Sos la Profesora IA oficial de la Escuela Iberoamericana de
 Estética y Bienestar, EIEB.
 
-En esta primera versión estás especializada exclusivamente en
-Reflexología Podal y acompañás a alumnas que ya compraron el curso.
+Estás especializada en Reflexología Podal y acompañás a alumnas
+que ya compraron el curso.
 
-PRIORIDAD DE INFORMACIÓN
+ORDEN DE PRIORIDAD
 
-- Consultá primero los documentos oficiales del curso mediante
-  la herramienta File Search.
-- Cuando la respuesta esté en los documentos, basate principalmente
-  en ellos y no agregues datos externos innecesarios.
-- Si los documentos no contienen información suficiente, decilo
-  claramente.
-- Podés complementar con conocimiento general confiable, pero
-  debés aclarar que se trata de información complementaria.
-- Nunca afirmes que algo aparece en una página, módulo o clase
-  específica si no encontraste esa referencia.
-- Tené en cuenta los mensajes anteriores de la conversación.
-- Cuando la alumna diga "esa parte", "la tercera", "lo anterior"
-  o expresiones similares, interpretalas usando el contexto previo.
+1. Interpretá primero la pregunta usando la conversación reciente.
+2. Si la alumna dice "la tercera", "eso", "esa parte",
+   "lo anterior" o algo parecido, buscá el referente en los
+   mensajes anteriores de la conversación.
+3. Solo después consultá los documentos del curso mediante
+   File Search para ampliar o verificar la respuesta.
+4. No interpretes una referencia conversacional como un número
+   de paso, página o apartado del manual salvo que la alumna
+   lo indique expresamente.
 
-OBJETIVO PEDAGÓGICO
+EJEMPLO
 
-Tu objetivo no es solamente responder preguntas. Tu objetivo es
-que la alumna comprenda el contenido, gane confianza y pueda
-continuar estudiando.
+Profesora:
+1. Lesiones agudas.
+2. Trastornos circulatorios.
+3. Embarazo.
 
-FORMA DE RESPONDER
+Alumna:
+"Explicame la tercera más fácil."
+
+Interpretación correcta:
+La alumna se refiere al embarazo, porque fue el tercer elemento
+de la respuesta anterior.
+
+Interpretación incorrecta:
+Buscar el paso 3 o el punto 3 del manual.
+
+DOCUMENTOS DEL CURSO
+
+- Consultá primero los documentos oficiales cuando necesites
+  información sobre Reflexología Podal.
+- Si encontrás la respuesta, basate principalmente en ellos.
+- Si no hay información suficiente, decilo claramente.
+- No inventes páginas, clases, módulos ni referencias.
+- Si complementás con conocimiento general, aclaralo.
+
+FORMA DE ENSEÑAR
 
 - Respondé siempre en español.
 - Usá un tono amable, profesional, paciente y cercano.
 - Explicá con palabras sencillas.
-- Cuando uses un término técnico, explicá qué significa.
+- Definí los términos técnicos.
 - Dividí las explicaciones complejas en pasos.
-- Utilizá ejemplos cuando ayuden a comprender.
+- Usá ejemplos cuando ayuden.
+- No repitas exactamente una explicación si la alumna dice
+  que no entendió.
 - Evitá respuestas innecesariamente extensas.
-- No respondas de forma fría o robótica.
-- No llenes la respuesta de emojis.
-- No termines siempre con una pregunta.
-- Cuando sea apropiado, ofrecé explicar el tema de una forma más
-  sencilla o con un ejemplo práctico.
-- Si la alumna dice que no entendió, no repitas exactamente la
-  misma respuesta: explicá el tema de otra manera.
+- No llenes las respuestas de emojis.
 
 SEGURIDAD
 
@@ -155,16 +158,15 @@ SEGURIDAD
 - No indiques tratamientos médicos.
 - No afirmes que la reflexología cura enfermedades.
 - No prometas resultados terapéuticos.
-- No reemplaces la consulta con un profesional de la salud.
+- No reemplaces a profesionales de la salud.
 - Ante síntomas, lesiones o situaciones médicas, recomendá
   consultar con un profesional habilitado.
 
 ALCANCE
 
-- Respondé consultas pedagógicas sobre Reflexología Podal y el
-  contenido del curso.
-- Si preguntan algo completamente ajeno, explicá amablemente que
-  tu función es acompañar el aprendizaje dentro de EIEB.
+Respondé consultas pedagógicas sobre Reflexología Podal y el
+contenido del curso. Si la consulta es completamente ajena,
+explicá amablemente cuál es tu función.
 """
 
 
@@ -186,7 +188,7 @@ def health():
             OPENAI_VECTOR_STORE_ID
         ),
         "model": OPENAI_MODEL,
-        "version": "0.4.0",
+        "version": "0.5.0",
     }
 
 
@@ -195,33 +197,42 @@ def chat(data: ChatRequest):
     if client is None:
         raise HTTPException(
             status_code=503,
-            detail=(
-                "La conexión con OpenAI no está configurada."
-            ),
+            detail="OpenAI no está configurado.",
         )
 
     if not OPENAI_VECTOR_STORE_ID:
         raise HTTPException(
             status_code=503,
-            detail=(
-                "La base de conocimiento no está configurada."
-            ),
+            detail="La base de conocimiento no está configurada.",
         )
 
     question = data.message.strip()
 
-    if not question:
-        raise HTTPException(
-            status_code=400,
-            detail="La pregunta no puede estar vacía.",
-        )
+    # Conservamos solo los últimos 10 mensajes para controlar
+    # costos y evitar conversaciones excesivamente largas.
+    recent_history = data.history[-10:]
+
+    conversation_input = [
+        {
+            "role": item.role,
+            "content": item.content,
+        }
+        for item in recent_history
+    ]
+
+    conversation_input.append(
+        {
+            "role": "user",
+            "content": question,
+        }
+    )
 
     try:
-        request_data = {
-            "model": OPENAI_MODEL,
-            "instructions": SYSTEM_PROMPT,
-            "input": question,
-            "tools": [
+        response = client.responses.create(
+            model=OPENAI_MODEL,
+            instructions=SYSTEM_PROMPT,
+            input=conversation_input,
+            tools=[
                 {
                     "type": "file_search",
                     "vector_store_ids": [
@@ -230,36 +241,23 @@ def chat(data: ChatRequest):
                     "max_num_results": 5,
                 }
             ],
-        }
-
-        if data.previous_response_id:
-            request_data["previous_response_id"] = (
-                data.previous_response_id
-            )
-
-        response = client.responses.create(**request_data)
+        )
 
         answer = response.output_text.strip()
 
         if not answer:
             raise HTTPException(
                 status_code=502,
-                detail=(
-                    "El modelo no devolvió una respuesta."
-                ),
+                detail="El modelo no devolvió una respuesta.",
             )
 
         return ChatResponse(
             answer=answer,
             model=OPENAI_MODEL,
-            response_id=response.id,
         )
 
     except AuthenticationError as error:
-        logger.exception(
-            "Clave de OpenAI inválida: %s",
-            error,
-        )
+        logger.exception("Clave inválida: %s", error)
 
         raise HTTPException(
             status_code=502,
@@ -267,10 +265,7 @@ def chat(data: ChatRequest):
         ) from error
 
     except RateLimitError as error:
-        logger.exception(
-            "Límite o saldo insuficiente en OpenAI: %s",
-            error,
-        )
+        logger.exception("Límite de uso: %s", error)
 
         raise HTTPException(
             status_code=429,
@@ -281,40 +276,26 @@ def chat(data: ChatRequest):
         ) from error
 
     except APIConnectionError as error:
-        logger.exception(
-            "No se pudo conectar con OpenAI: %s",
-            error,
-        )
+        logger.exception("Error de conexión: %s", error)
 
         raise HTTPException(
             status_code=502,
-            detail=(
-                "No fue posible conectarse con OpenAI."
-            ),
+            detail="No fue posible conectarse con OpenAI.",
         ) from error
 
     except APIStatusError as error:
-        logger.exception(
-            "OpenAI devolvió un error de estado: %s",
-            error,
-        )
+        logger.exception("Error de OpenAI: %s", error)
 
         raise HTTPException(
             status_code=502,
-            detail=(
-                "OpenAI devolvió un error al procesar "
-                "la conversación."
-            ),
+            detail="OpenAI devolvió un error.",
         ) from error
 
     except HTTPException:
         raise
 
     except Exception as error:
-        logger.exception(
-            "Error inesperado en /chat: %s",
-            error,
-        )
+        logger.exception("Error inesperado: %s", error)
 
         raise HTTPException(
             status_code=500,
