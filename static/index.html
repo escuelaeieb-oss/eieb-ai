@@ -1,185 +1,606 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Profesora IA - EIEB</title>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1"
+  >
 
-<style>
+  <title>Profesora IA de Reflexología | EIEB</title>
 
-body{
-margin:0;
-font-family:Arial,Helvetica,sans-serif;
-background:#f5f5f5;
-}
+  <style>
+    :root {
+      --black: #171717;
+      --gold: #c6a14b;
+      --gold-dark: #9f7e32;
+      --background: #f4f4f4;
+      --surface: #ffffff;
+      --border: #e3e3e3;
+      --text: #202020;
+      --muted: #707070;
+      --student: #171717;
+      --teacher: #f0f0f0;
+      --danger: #b42318;
+    }
 
-.container{
-max-width:900px;
-margin:auto;
-height:100vh;
-display:flex;
-flex-direction:column;
-}
+    * {
+      box-sizing: border-box;
+    }
 
-.header{
-background:#222;
-color:white;
-padding:20px;
-font-size:28px;
-font-weight:bold;
-}
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--background);
+      color: var(--text);
+    }
 
-#chat{
-flex:1;
-overflow:auto;
-padding:20px;
-background:white;
-}
+    body {
+      display: flex;
+      justify-content: center;
+    }
 
-.user{
-background:#DCF8C6;
-padding:12px;
-margin:10px 0;
-border-radius:12px;
-align-self:flex-end;
-}
+    .app {
+      width: 100%;
+      max-width: 960px;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      box-shadow: 0 0 35px rgba(0, 0, 0, 0.08);
+    }
 
-.bot{
-background:#ececec;
-padding:12px;
-margin:10px 0;
-border-radius:12px;
-white-space:pre-wrap;
-}
+    .header {
+      flex: 0 0 auto;
+      background: var(--black);
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      border-bottom: 3px solid var(--gold);
+    }
 
-.footer{
-display:flex;
-padding:15px;
-background:#ddd;
-}
+    .avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--gold);
+      color: var(--black);
+      font-size: 25px;
+      flex-shrink: 0;
+    }
 
-input{
-flex:1;
-padding:15px;
-font-size:16px;
-border:none;
-border-radius:10px;
-}
+    .header-copy {
+      min-width: 0;
+    }
 
-button{
-margin-left:10px;
-padding:15px 25px;
-font-size:16px;
-background:#1b5cff;
-color:white;
-border:none;
-border-radius:10px;
-cursor:pointer;
-}
+    .header-title {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+    }
 
-button:hover{
-background:#1148ca;
-}
+    .header-status {
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #d8d8d8;
+      font-size: 13px;
+    }
 
-</style>
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #31c76a;
+      box-shadow: 0 0 0 3px rgba(49, 199, 106, 0.13);
+    }
 
+    .chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 22px 18px;
+      scroll-behavior: smooth;
+    }
+
+    .welcome {
+      max-width: 680px;
+      margin: 5px auto 18px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: #fafafa;
+    }
+
+    .welcome h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
+    .welcome p {
+      margin: 0;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .suggestions {
+      max-width: 680px;
+      margin: 0 auto 24px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px;
+    }
+
+    .suggestion {
+      border: 1px solid var(--border);
+      background: white;
+      border-radius: 13px;
+      padding: 11px 13px;
+      text-align: left;
+      cursor: pointer;
+      color: var(--text);
+      font-size: 14px;
+      transition: 0.18s ease;
+    }
+
+    .suggestion:hover {
+      border-color: var(--gold);
+      transform: translateY(-1px);
+    }
+
+    .message-row {
+      width: 100%;
+      display: flex;
+      margin: 13px 0;
+    }
+
+    .message-row.student {
+      justify-content: flex-end;
+    }
+
+    .message-row.teacher {
+      justify-content: flex-start;
+    }
+
+    .message {
+      max-width: min(76%, 680px);
+      padding: 13px 15px;
+      border-radius: 17px;
+      line-height: 1.55;
+      font-size: 15px;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .student .message {
+      color: white;
+      background: var(--student);
+      border-bottom-right-radius: 5px;
+    }
+
+    .teacher .message {
+      background: var(--teacher);
+      border-bottom-left-radius: 5px;
+    }
+
+    .teacher-label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--gold-dark);
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .typing {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 60px;
+    }
+
+    .typing span {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #777;
+      animation: bounce 1.2s infinite ease-in-out;
+    }
+
+    .typing span:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+
+    .typing span:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+
+    @keyframes bounce {
+      0%, 70%, 100% {
+        transform: translateY(0);
+        opacity: 0.4;
+      }
+
+      35% {
+        transform: translateY(-5px);
+        opacity: 1;
+      }
+    }
+
+    .error {
+      color: var(--danger);
+      background: #fff1f0 !important;
+      border: 1px solid #f3c7c3;
+    }
+
+    .composer-wrap {
+      flex: 0 0 auto;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      padding: 12px 14px 15px;
+    }
+
+    .composer {
+      max-width: 760px;
+      margin: auto;
+      display: flex;
+      align-items: flex-end;
+      gap: 9px;
+      padding: 8px;
+      border: 1px solid #d7d7d7;
+      border-radius: 18px;
+      background: white;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    textarea {
+      flex: 1;
+      min-height: 44px;
+      max-height: 130px;
+      padding: 11px 10px;
+      resize: none;
+      border: none;
+      outline: none;
+      font: inherit;
+      line-height: 1.4;
+      background: transparent;
+    }
+
+    .send {
+      width: 46px;
+      height: 46px;
+      border: none;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      background: var(--gold);
+      color: var(--black);
+      cursor: pointer;
+      font-size: 21px;
+      font-weight: bold;
+      transition: 0.18s ease;
+    }
+
+    .send:hover {
+      background: var(--gold-dark);
+      color: white;
+    }
+
+    .send:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    .disclaimer {
+      max-width: 760px;
+      margin: 8px auto 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 640px) {
+      .header {
+        padding: 13px 14px;
+      }
+
+      .header-title {
+        font-size: 17px;
+      }
+
+      .chat {
+        padding: 15px 11px;
+      }
+
+      .welcome {
+        padding: 16px;
+      }
+
+      .suggestions {
+        grid-template-columns: 1fr;
+      }
+
+      .message {
+        max-width: 88%;
+      }
+
+      .composer-wrap {
+        padding: 9px;
+      }
+    }
+  </style>
 </head>
 
 <body>
+  <main class="app">
+    <header class="header">
+      <div class="avatar">👩‍🏫</div>
 
-<div class="container">
+      <div class="header-copy">
+        <h1 class="header-title">
+          Profesora IA de Reflexología
+        </h1>
 
-<div class="header">
+        <div class="header-status">
+          <span class="status-dot"></span>
+          Asistente pedagógica de EIEB
+        </div>
+      </div>
+    </header>
 
-👩‍🏫 Profesora IA de Reflexología
+    <section id="chat" class="chat">
+      <div id="intro">
+        <div class="welcome">
+          <h2>Hola 😊</h2>
 
-</div>
+          <p>
+            Soy la profesora IA del curso de Reflexología Podal.
+            Puedo ayudarte a comprender las clases, repasar
+            procedimientos y resolver dudas sobre el material.
+          </p>
+        </div>
 
-<div id="chat">
+        <div class="suggestions">
+          <button
+            class="suggestion"
+            onclick="usarSugerencia('¿Qué precauciones debo tener antes de una sesión?')"
+          >
+            Precauciones antes de una sesión
+          </button>
 
-<div class="bot">
+          <button
+            class="suggestion"
+            onclick="usarSugerencia('¿Qué materiales necesito para realizar la técnica?')"
+          >
+            Materiales necesarios
+          </button>
 
-Hola 😊
+          <button
+            class="suggestion"
+            onclick="usarSugerencia('Explicame cómo limpiar la varita de madera.')"
+          >
+            Limpieza de la varita
+          </button>
 
-Soy la profesora IA del curso de Reflexología Podal.
+          <button
+            class="suggestion"
+            onclick="usarSugerencia('Haceme cinco preguntas para repasar el curso.')"
+          >
+            Repasar con preguntas
+          </button>
+        </div>
+      </div>
+    </section>
 
-Podés preguntarme cualquier duda sobre el curso.
+    <footer class="composer-wrap">
+      <div class="composer">
+        <textarea
+          id="messageInput"
+          rows="1"
+          maxlength="4000"
+          placeholder="Escribí tu pregunta..."
+          aria-label="Escribí tu pregunta"
+        ></textarea>
 
-</div>
+        <button
+          id="sendButton"
+          class="send"
+          type="button"
+          onclick="enviarMensaje()"
+          aria-label="Enviar mensaje"
+        >
+          ➤
+        </button>
+      </div>
 
-</div>
+      <div class="disclaimer">
+        Este asistente brinda orientación educativa y no reemplaza
+        la consulta con profesionales de la salud.
+      </div>
+    </footer>
+  </main>
 
-<div class="footer">
+  <script>
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("messageInput");
+    const sendButton = document.getElementById("sendButton");
 
-<input
-id="msg"
-placeholder="Escribí tu pregunta...">
+    let waiting = false;
 
-<button onclick="enviar()">
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
 
-Enviar
+    function removeIntro() {
+      const intro = document.getElementById("intro");
 
-</button>
+      if (intro) {
+        intro.remove();
+      }
+    }
 
-</div>
+    function addMessage(role, text, extraClass = "") {
+      const row = document.createElement("div");
+      row.className = `message-row ${role}`;
 
-</div>
+      const bubble = document.createElement("div");
+      bubble.className = `message ${extraClass}`;
 
-<script>
+      if (role === "teacher") {
+        const label = document.createElement("span");
+        label.className = "teacher-label";
+        label.textContent = "Profesora IA";
+        bubble.appendChild(label);
+      }
 
-async function enviar(){
+      const content = document.createElement("span");
+      content.innerHTML = escapeHtml(text);
+      bubble.appendChild(content);
 
-let input=document.getElementById("msg");
+      row.appendChild(bubble);
+      chat.appendChild(row);
+      scrollToBottom();
 
-let texto=input.value.trim();
+      return row;
+    }
 
-if(texto=="") return;
+    function addTyping() {
+      const row = document.createElement("div");
+      row.className = "message-row teacher";
+      row.id = "typingMessage";
 
-let chat=document.getElementById("chat");
+      row.innerHTML = `
+        <div class="message">
+          <span class="teacher-label">Profesora IA</span>
 
-chat.innerHTML+=`<div class="user">${texto}</div>`;
+          <span class="typing" aria-label="Escribiendo">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+        </div>
+      `;
 
-input.value="";
+      chat.appendChild(row);
+      scrollToBottom();
+    }
 
-chat.scrollTop=chat.scrollHeight;
+    function removeTyping() {
+      const typing = document.getElementById("typingMessage");
 
-let r=await fetch("/chat",{
+      if (typing) {
+        typing.remove();
+      }
+    }
 
-method:"POST",
+    function scrollToBottom() {
+      requestAnimationFrame(() => {
+        chat.scrollTop = chat.scrollHeight;
+      });
+    }
 
-headers:{
-"Content-Type":"application/json"
-},
+    function resizeInput() {
+      input.style.height = "auto";
+      input.style.height =
+        Math.min(input.scrollHeight, 130) + "px";
+    }
 
-body:JSON.stringify({
+    function usarSugerencia(question) {
+      input.value = question;
+      resizeInput();
+      enviarMensaje();
+    }
 
-message:texto
+    async function enviarMensaje() {
+      const message = input.value.trim();
 
-})
+      if (!message || waiting) {
+        return;
+      }
 
-});
+      waiting = true;
+      sendButton.disabled = true;
 
-let j=await r.json();
+      removeIntro();
+      addMessage("student", message);
 
-chat.innerHTML+=`<div class="bot">${j.answer}</div>`;
+      input.value = "";
+      resizeInput();
+      addTyping();
 
-chat.scrollTop=chat.scrollHeight;
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            message: message
+          })
+        });
 
-}
+        let data;
 
-document.getElementById("msg")
-.addEventListener("keypress",function(e){
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error(
+            "El servidor devolvió una respuesta inválida."
+          );
+        }
 
-if(e.key==="Enter"){
+        removeTyping();
 
-enviar();
+        if (!response.ok) {
+          throw new Error(
+            data.detail ||
+            "No fue posible obtener una respuesta."
+          );
+        }
 
-}
+        addMessage(
+          "teacher",
+          data.answer ||
+          "No pude generar una respuesta en este momento."
+        );
+      } catch (error) {
+        removeTyping();
 
-});
+        addMessage(
+          "teacher",
+          error.message ||
+          "Ocurrió un error. Intentá nuevamente.",
+          "error"
+        );
+      } finally {
+        waiting = false;
+        sendButton.disabled = false;
+        input.focus();
+      }
+    }
 
-</script>
+    input.addEventListener("input", resizeInput);
 
+    input.addEventListener("keydown", (event) => {
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+        enviarMensaje();
+      }
+    });
+
+    input.focus();
+  </script>
 </body>
-
 </html>
