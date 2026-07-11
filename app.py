@@ -22,7 +22,7 @@ logger = logging.getLogger("eieb-ai")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.5")
-
+OPENAI_VECTOR_STORE_ID = os.getenv("OPENAI_VECTOR_STORE_ID")
 if not OPENAI_API_KEY:
     logger.warning(
         "La variable OPENAI_API_KEY no está configurada."
@@ -179,11 +179,17 @@ def chat(data: ChatRequest):
         )
 
     try:
-        response = client.responses.create(
-            model=OPENAI_MODEL,
-            instructions=SYSTEM_PROMPT,
-            input=question,
-        )
+response = client.responses.create(
+    model=OPENAI_MODEL,
+    instructions=SYSTEM_PROMPT,
+    input=question,
+    tools=[
+        {
+            "type": "file_search",
+            "vector_store_ids": [OPENAI_VECTOR_STORE_ID],
+        }
+    ],
+)
 
         answer = response.output_text.strip()
 
