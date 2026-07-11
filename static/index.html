@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1, maximum-scale=1"
@@ -56,7 +57,7 @@
       flex: 0 0 auto;
       background: var(--black);
       color: white;
-      padding: 16px 20px;
+      padding: 14px 20px;
       display: flex;
       align-items: center;
       gap: 13px;
@@ -77,6 +78,7 @@
 
     .header-copy {
       min-width: 0;
+      flex: 1;
     }
 
     .header-title {
@@ -100,6 +102,23 @@
       border-radius: 50%;
       background: #31c76a;
       box-shadow: 0 0 0 3px rgba(49, 199, 106, 0.13);
+    }
+
+    .new-chat {
+      padding: 8px 11px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 9px;
+      background: transparent;
+      color: white;
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+      transition: 0.18s ease;
+    }
+
+    .new-chat:hover {
+      border-color: var(--gold);
+      color: var(--gold);
     }
 
     .chat {
@@ -221,7 +240,9 @@
     }
 
     @keyframes bounce {
-      0%, 70%, 100% {
+      0%,
+      70%,
+      100% {
         transform: translateY(0);
         opacity: 0.4;
       }
@@ -308,11 +329,26 @@
 
     @media (max-width: 640px) {
       .header {
-        padding: 13px 14px;
+        padding: 12px;
+      }
+
+      .avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 21px;
       }
 
       .header-title {
-        font-size: 17px;
+        font-size: 16px;
+      }
+
+      .header-status {
+        font-size: 11px;
+      }
+
+      .new-chat {
+        padding: 7px 8px;
+        font-size: 11px;
       }
 
       .chat {
@@ -353,6 +389,14 @@
           Asistente pedagógica de EIEB
         </div>
       </div>
+
+      <button
+        class="new-chat"
+        type="button"
+        onclick="nuevaConversacion()"
+      >
+        Nueva conversación
+      </button>
     </header>
 
     <section id="chat" class="chat">
@@ -370,28 +414,36 @@
         <div class="suggestions">
           <button
             class="suggestion"
-            onclick="usarSugerencia('¿Qué precauciones debo tener antes de una sesión?')"
+            onclick="usarSugerencia(
+              '¿Qué precauciones debo tener antes de una sesión?'
+            )"
           >
             Precauciones antes de una sesión
           </button>
 
           <button
             class="suggestion"
-            onclick="usarSugerencia('¿Qué materiales necesito para realizar la técnica?')"
+            onclick="usarSugerencia(
+              '¿Qué materiales necesito para realizar la técnica?'
+            )"
           >
             Materiales necesarios
           </button>
 
           <button
             class="suggestion"
-            onclick="usarSugerencia('Explicame cómo limpiar la varita de madera.')"
+            onclick="usarSugerencia(
+              'Explicame cómo limpiar la varita de madera.'
+            )"
           >
             Limpieza de la varita
           </button>
 
           <button
             class="suggestion"
-            onclick="usarSugerencia('Haceme cinco preguntas para repasar el curso.')"
+            onclick="usarSugerencia(
+              'Haceme cinco preguntas para repasar el curso.'
+            )"
           >
             Repasar con preguntas
           </button>
@@ -434,6 +486,9 @@
 
     let waiting = false;
 
+    let previousResponseId =
+      localStorage.getItem("eieb_previous_response_id");
+
     function escapeHtml(text) {
       const div = document.createElement("div");
       div.textContent = text;
@@ -468,6 +523,7 @@
 
       row.appendChild(bubble);
       chat.appendChild(row);
+
       scrollToBottom();
 
       return row;
@@ -495,7 +551,9 @@
     }
 
     function removeTyping() {
-      const typing = document.getElementById("typingMessage");
+      const typing = document.getElementById(
+        "typingMessage"
+      );
 
       if (typing) {
         typing.remove();
@@ -510,6 +568,7 @@
 
     function resizeInput() {
       input.style.height = "auto";
+
       input.style.height =
         Math.min(input.scrollHeight, 130) + "px";
     }
@@ -518,6 +577,16 @@
       input.value = question;
       resizeInput();
       enviarMensaje();
+    }
+
+    function nuevaConversacion() {
+      previousResponseId = null;
+
+      localStorage.removeItem(
+        "eieb_previous_response_id"
+      );
+
+      location.reload();
     }
 
     async function enviarMensaje() {
@@ -540,11 +609,14 @@
       try {
         const response = await fetch("/chat", {
           method: "POST",
+
           headers: {
             "Content-Type": "application/json"
           },
+
           body: JSON.stringify({
-            message: message
+            message: message,
+            previous_response_id: previousResponseId
           })
         });
 
@@ -564,6 +636,15 @@
           throw new Error(
             data.detail ||
             "No fue posible obtener una respuesta."
+          );
+        }
+
+        if (data.response_id) {
+          previousResponseId = data.response_id;
+
+          localStorage.setItem(
+            "eieb_previous_response_id",
+            previousResponseId
           );
         }
 
@@ -588,17 +669,23 @@
       }
     }
 
-    input.addEventListener("input", resizeInput);
+    input.addEventListener(
+      "input",
+      resizeInput
+    );
 
-    input.addEventListener("keydown", (event) => {
-      if (
-        event.key === "Enter" &&
-        !event.shiftKey
-      ) {
-        event.preventDefault();
-        enviarMensaje();
+    input.addEventListener(
+      "keydown",
+      (event) => {
+        if (
+          event.key === "Enter" &&
+          !event.shiftKey
+        ) {
+          event.preventDefault();
+          enviarMensaje();
+        }
       }
-    });
+    );
 
     input.focus();
   </script>
