@@ -27,14 +27,20 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.5")
 OPENAI_VECTOR_STORE_ID = os.getenv("OPENAI_VECTOR_STORE_ID")
 
 if not OPENAI_API_KEY:
-    logger.warning("La variable OPENAI_API_KEY no está configurada.")
+    logger.warning(
+        "La variable OPENAI_API_KEY no está configurada."
+    )
 
 if not OPENAI_VECTOR_STORE_ID:
     logger.warning(
         "La variable OPENAI_VECTOR_STORE_ID no está configurada."
     )
 
-client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+client = (
+    OpenAI(api_key=OPENAI_API_KEY)
+    if OPENAI_API_KEY
+    else None
+)
 
 
 # ---------------------------------------------------------
@@ -47,7 +53,7 @@ app = FastAPI(
         "Asistente pedagógico de la Escuela Iberoamericana "
         "de Estética y Bienestar."
     ),
-    version="0.3.0",
+    version="0.4.0",
 )
 
 app.add_middleware(
@@ -58,7 +64,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Publica los archivos de la carpeta static.
 app.mount(
     "/static",
     StaticFiles(directory="static"),
@@ -79,10 +84,19 @@ class ChatRequest(BaseModel):
         examples=["¿Qué es la reflexología podal?"],
     )
 
+    previous_response_id: str | None = Field(
+        default=None,
+        description=(
+            "Identificador de la respuesta anterior para "
+            "mantener el contexto de la conversación."
+        ),
+    )
+
 
 class ChatResponse(BaseModel):
     answer: str
     model: str
+    response_id: str
 
 
 # ---------------------------------------------------------
@@ -104,10 +118,13 @@ PRIORIDAD DE INFORMACIÓN
   en ellos y no agregues datos externos innecesarios.
 - Si los documentos no contienen información suficiente, decilo
   claramente.
-- Podés complementar con conocimiento general confiable, pero debés
-  aclarar que se trata de información complementaria.
+- Podés complementar con conocimiento general confiable, pero
+  debés aclarar que se trata de información complementaria.
 - Nunca afirmes que algo aparece en una página, módulo o clase
   específica si no encontraste esa referencia.
+- Tené en cuenta los mensajes anteriores de la conversación.
+- Cuando la alumna diga "esa parte", "la tercera", "lo anterior"
+  o expresiones similares, interpretalas usando el contexto previo.
 
 OBJETIVO PEDAGÓGICO
 
@@ -129,6 +146,8 @@ FORMA DE RESPONDER
 - No termines siempre con una pregunta.
 - Cuando sea apropiado, ofrecé explicar el tema de una forma más
   sencilla o con un ejemplo práctico.
+- Si la alumna dice que no entendió, no repitas exactamente la
+  misma respuesta: explicá el tema de otra manera.
 
 SEGURIDAD
 
@@ -163,8 +182,11 @@ def health():
     return {
         "status": "ok",
         "openai_configured": bool(OPENAI_API_KEY),
-        "vector_store_configured": bool(OPENAI_VECTOR_STORE_ID),
+        "vector_store_configured": bool(
+            OPENAI_VECTOR_STORE_ID
+        ),
         "model": OPENAI_MODEL,
+        "version": "0.4.0",
     }
 
 
@@ -173,13 +195,17 @@ def chat(data: ChatRequest):
     if client is None:
         raise HTTPException(
             status_code=503,
-            detail="La conexión con OpenAI no está configurada.",
+            detail=(
+                "La conexión con OpenAI no está configurada."
+            ),
         )
 
     if not OPENAI_VECTOR_STORE_ID:
         raise HTTPException(
             status_code=503,
-            detail="La base de conocimiento no está configurada.",
+            detail=(
+                "La base de conocimiento no está configurada."
+            ),
         )
 
     question = data.message.strip()
@@ -191,36 +217,49 @@ def chat(data: ChatRequest):
         )
 
     try:
-        response = client.responses.create(
-            model=OPENAI_MODEL,
-            instructions=SYSTEM_PROMPT,
-            input=question,
-            tools=[
+        request_data = {
+            "model": OPENAI_MODEL,
+            "instructions": SYSTEM_PROMPT,
+            "input": question,
+            "tools": [
                 {
                     "type": "file_search",
                     "vector_store_ids": [
-                        OPENAI_VECTOR_STORE_ID,
+                        OPENAI_VECTOR_STORE_ID
                     ],
                     "max_num_results": 5,
                 }
             ],
-        )
+        }
+
+        if data.previous_response_id:
+            request_data["previous_response_id"] = (
+                data.previous_response_id
+            )
+
+        response = client.responses.create(**request_data)
 
         answer = response.output_text.strip()
 
         if not answer:
             raise HTTPException(
                 status_code=502,
-                detail="El modelo no devolvió una respuesta.",
+                detail=(
+                    "El modelo no devolvió una respuesta."
+                ),
             )
 
         return ChatResponse(
             answer=answer,
             model=OPENAI_MODEL,
+            response_id=response.id,
         )
 
     except AuthenticationError as error:
-        logger.exception("Clave de OpenAI inválida: %s", error)
+        logger.exception(
+            "Clave de OpenAI inválida: %s",
+            error,
+        )
 
         raise HTTPException(
             status_code=502,
@@ -236,8 +275,8 @@ def chat(data: ChatRequest):
         raise HTTPException(
             status_code=429,
             detail=(
-                "El servicio alcanzó temporalmente su límite "
-                "de uso."
+                "El servicio alcanzó temporalmente "
+                "su límite de uso."
             ),
         ) from error
 
@@ -249,7 +288,9 @@ def chat(data: ChatRequest):
 
         raise HTTPException(
             status_code=502,
-            detail="No fue posible conectarse con OpenAI.",
+            detail=(
+                "No fue posible conectarse con OpenAI."
+            ),
         ) from error
 
     except APIStatusError as error:
@@ -260,7 +301,10 @@ def chat(data: ChatRequest):
 
         raise HTTPException(
             status_code=502,
-            detail="OpenAI devolvió un error.",
+            detail=(
+                "OpenAI devolvió un error al procesar "
+                "la conversación."
+            ),
         ) from error
 
     except HTTPException:
