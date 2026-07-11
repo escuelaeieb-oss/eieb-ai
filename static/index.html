@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Profesora IA - EIEB</title>
+
+<style>
+
+body{
+margin:0;
+font-family:Arial,Helvetica,sans-serif;
+background:#f5f5f5;
+}
+
+.container{
+max-width:900px;
+margin:auto;
+height:100vh;
+display:flex;
+flex-direction:column;
+}
+
+.header{
+background:#222;
+color:white;
+padding:20px;
+font-size:28px;
+font-weight:bold;
+}
+
+#chat{
+flex:1;
+overflow:auto;
+padding:20px;
+background:white;
+}
+
+.user{
+background:#DCF8C6;
+padding:12px;
+margin:10px 0;
+border-radius:12px;
+align-self:flex-end;
+}
+
+.bot{
+background:#ececec;
+padding:12px;
+margin:10px 0;
+border-radius:12px;
+white-space:pre-wrap;
+}
+
+.footer{
+display:flex;
+padding:15px;
+background:#ddd;
+}
+
+input{
+flex:1;
+padding:15px;
+font-size:16px;
+border:none;
+border-radius:10px;
+}
+
+button{
+margin-left:10px;
+padding:15px 25px;
+font-size:16px;
+background:#1b5cff;
+color:white;
+border:none;
+border-radius:10px;
+cursor:pointer;
+}
+
+button:hover{
+background:#1148ca;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="header">
+
+👩‍🏫 Profesora IA de Reflexología
+
+</div>
+
+<div id="chat">
+
+<div class="bot">
+
+Hola 😊
+
+Soy la profesora IA del curso de Reflexología Podal.
+
+Podés preguntarme cualquier duda sobre el curso.
+
+</div>
+
+</div>
+
+<div class="footer">
+
+<input
+id="msg"
+placeholder="Escribí tu pregunta...">
+
+<button onclick="enviar()">
+
+Enviar
+
+</button>
+
+</div>
+
+</div>
+
+<script>
+
+async function enviar(){
+
+let input=document.getElementById("msg");
+
+let texto=input.value.trim();
+
+if(texto=="") return;
+
+let chat=document.getElementById("chat");
+
+chat.innerHTML+=`<div class="user">${texto}</div>`;
+
+input.value="";
+
+chat.scrollTop=chat.scrollHeight;
+
+let r=await fetch("/chat",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+
+message:texto
+
+})
+
+});
+
+let j=await r.json();
+
+chat.innerHTML+=`<div class="bot">${j.answer}</div>`;
+
+chat.scrollTop=chat.scrollHeight;
+
+}
+
+document.getElementById("msg")
+.addEventListener("keypress",function(e){
+
+if(e.key==="Enter"){
+
+enviar();
+
+}
+
+});
+
+</script>
+
+</body>
+
+</html>
