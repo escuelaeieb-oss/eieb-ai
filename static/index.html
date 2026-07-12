@@ -480,214 +480,248 @@
   </main>
 
   <script>
-    const chat = document.getElementById("chat");
-    const input = document.getElementById("messageInput");
-    const sendButton = document.getElementById("sendButton");
+  const chat = document.getElementById("chat");
+  const input = document.getElementById("messageInput");
+  const sendButton = document.getElementById("sendButton");
 
-    let waiting = false;
+  let waiting = false;
 
-    let previousResponseId =
-      localStorage.getItem("eieb_previous_response_id");
+  let conversationHistory = [];
 
-    function escapeHtml(text) {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
+  try {
+    conversationHistory = JSON.parse(
+      localStorage.getItem("eieb_conversation_history")
+    ) || [];
+  } catch {
+    conversationHistory = [];
+  }
+
+  function saveHistory() {
+    conversationHistory = conversationHistory.slice(-10);
+
+    localStorage.setItem(
+      "eieb_conversation_history",
+      JSON.stringify(conversationHistory)
+    );
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function removeIntro() {
+    const intro = document.getElementById("intro");
+
+    if (intro) {
+      intro.remove();
+    }
+  }
+
+  function addMessage(role, text, extraClass = "") {
+    const row = document.createElement("div");
+
+    row.className =
+      `message-row ${
+        role === "user" ? "student" : "teacher"
+      }`;
+
+    const bubble = document.createElement("div");
+    bubble.className = `message ${extraClass}`;
+
+    if (role === "assistant") {
+      const label = document.createElement("span");
+      label.className = "teacher-label";
+      label.textContent = "Profesora IA";
+      bubble.appendChild(label);
     }
 
-    function removeIntro() {
-      const intro = document.getElementById("intro");
+    const content = document.createElement("span");
+    content.innerHTML = escapeHtml(text);
+    bubble.appendChild(content);
 
-      if (intro) {
-        intro.remove();
-      }
+    row.appendChild(bubble);
+    chat.appendChild(row);
+
+    scrollToBottom();
+  }
+
+  function restoreConversation() {
+    if (!conversationHistory.length) {
+      return;
     }
 
-    function addMessage(role, text, extraClass = "") {
-      const row = document.createElement("div");
-      row.className = `message-row ${role}`;
+    removeIntro();
 
-      const bubble = document.createElement("div");
-      bubble.className = `message ${extraClass}`;
+    conversationHistory.forEach((item) => {
+      addMessage(item.role, item.content);
+    });
+  }
 
-      if (role === "teacher") {
-        const label = document.createElement("span");
-        label.className = "teacher-label";
-        label.textContent = "Profesora IA";
-        bubble.appendChild(label);
-      }
+  function addTyping() {
+    const row = document.createElement("div");
+    row.className = "message-row teacher";
+    row.id = "typingMessage";
 
-      const content = document.createElement("span");
-      content.innerHTML = escapeHtml(text);
-      bubble.appendChild(content);
+    row.innerHTML = `
+      <div class="message">
+        <span class="teacher-label">Profesora IA</span>
 
-      row.appendChild(bubble);
-      chat.appendChild(row);
+        <span class="typing" aria-label="Escribiendo">
+          <span></span>
+          <span></span>
+          <span></span>
+        </span>
+      </div>
+    `;
 
-      scrollToBottom();
+    chat.appendChild(row);
+    scrollToBottom();
+  }
 
-      return row;
+  function removeTyping() {
+    const typing = document.getElementById(
+      "typingMessage"
+    );
+
+    if (typing) {
+      typing.remove();
+    }
+  }
+
+  function scrollToBottom() {
+    requestAnimationFrame(() => {
+      chat.scrollTop = chat.scrollHeight;
+    });
+  }
+
+  function resizeInput() {
+    input.style.height = "auto";
+
+    input.style.height =
+      Math.min(input.scrollHeight, 130) + "px";
+  }
+
+  function usarSugerencia(question) {
+    input.value = question;
+    resizeInput();
+    enviarMensaje();
+  }
+
+  function nuevaConversacion() {
+    conversationHistory = [];
+
+    localStorage.removeItem(
+      "eieb_conversation_history"
+    );
+
+    location.reload();
+  }
+
+  async function enviarMensaje() {
+    const message = input.value.trim();
+
+    if (!message || waiting) {
+      return;
     }
 
-    function addTyping() {
-      const row = document.createElement("div");
-      row.className = "message-row teacher";
-      row.id = "typingMessage";
+    waiting = true;
+    sendButton.disabled = true;
 
-      row.innerHTML = `
-        <div class="message">
-          <span class="teacher-label">Profesora IA</span>
+    removeIntro();
+    addMessage("user", message);
 
-          <span class="typing" aria-label="Escribiendo">
-            <span></span>
-            <span></span>
-            <span></span>
-          </span>
-        </div>
-      `;
+    input.value = "";
+    resizeInput();
+    addTyping();
 
-      chat.appendChild(row);
-      scrollToBottom();
-    }
+    try {
+      const response = await fetch("/chat", {
+        method: "POST",
 
-    function removeTyping() {
-      const typing = document.getElementById(
-        "typingMessage"
-      );
+        headers: {
+          "Content-Type": "application/json"
+        },
 
-      if (typing) {
-        typing.remove();
-      }
-    }
-
-    function scrollToBottom() {
-      requestAnimationFrame(() => {
-        chat.scrollTop = chat.scrollHeight;
+        body: JSON.stringify({
+          message: message,
+          history: conversationHistory
+        })
       });
-    }
 
-    function resizeInput() {
-      input.style.height = "auto";
-
-      input.style.height =
-        Math.min(input.scrollHeight, 130) + "px";
-    }
-
-    function usarSugerencia(question) {
-      input.value = question;
-      resizeInput();
-      enviarMensaje();
-    }
-
-    function nuevaConversacion() {
-      previousResponseId = null;
-
-      localStorage.removeItem(
-        "eieb_previous_response_id"
-      );
-
-      location.reload();
-    }
-
-    async function enviarMensaje() {
-      const message = input.value.trim();
-
-      if (!message || waiting) {
-        return;
-      }
-
-      waiting = true;
-      sendButton.disabled = true;
-
-      removeIntro();
-      addMessage("student", message);
-
-      input.value = "";
-      resizeInput();
-      addTyping();
+      let data;
 
       try {
-        const response = await fetch("/chat", {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json"
-          },
-
-          body: JSON.stringify({
-            message: message,
-            previous_response_id: previousResponseId
-          })
-        });
-
-        let data;
-
-        try {
-          data = await response.json();
-        } catch {
-          throw new Error(
-            "El servidor devolvió una respuesta inválida."
-          );
-        }
-
-        removeTyping();
-
-        if (!response.ok) {
-          throw new Error(
-            data.detail ||
-            "No fue posible obtener una respuesta."
-          );
-        }
-
-        if (data.response_id) {
-          previousResponseId = data.response_id;
-
-          localStorage.setItem(
-            "eieb_previous_response_id",
-            previousResponseId
-          );
-        }
-
-        addMessage(
-          "teacher",
-          data.answer ||
-          "No pude generar una respuesta en este momento."
+        data = await response.json();
+      } catch {
+        throw new Error(
+          "El servidor devolvió una respuesta inválida."
         );
-      } catch (error) {
-        removeTyping();
+      }
 
-        addMessage(
-          "teacher",
-          error.message ||
-          "Ocurrió un error. Intentá nuevamente.",
-          "error"
+      removeTyping();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ||
+          "No fue posible obtener una respuesta."
         );
-      } finally {
-        waiting = false;
-        sendButton.disabled = false;
-        input.focus();
+      }
+
+      conversationHistory.push({
+        role: "user",
+        content: message
+      });
+
+      conversationHistory.push({
+        role: "assistant",
+        content: data.answer
+      });
+
+      saveHistory();
+
+      addMessage(
+        "assistant",
+        data.answer ||
+        "No pude generar una respuesta."
+      );
+    } catch (error) {
+      removeTyping();
+
+      addMessage(
+        "assistant",
+        error.message ||
+        "Ocurrió un error. Intentá nuevamente.",
+        "error"
+      );
+    } finally {
+      waiting = false;
+      sendButton.disabled = false;
+      input.focus();
+    }
+  }
+
+  input.addEventListener(
+    "input",
+    resizeInput
+  );
+
+  input.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+        enviarMensaje();
       }
     }
+  );
 
-    input.addEventListener(
-      "input",
-      resizeInput
-    );
-
-    input.addEventListener(
-      "keydown",
-      (event) => {
-        if (
-          event.key === "Enter" &&
-          !event.shiftKey
-        ) {
-          event.preventDefault();
-          enviarMensaje();
-        }
-      }
-    );
-
-    input.focus();
-  </script>
+  restoreConversation();
+  input.focus();
+</script>
 </body>
 </html>
