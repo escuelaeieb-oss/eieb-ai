@@ -485,14 +485,22 @@
   const sendButton = document.getElementById("sendButton");
 
   let waiting = false;
-
   let conversationHistory = [];
 
   try {
-    conversationHistory = JSON.parse(
-      localStorage.getItem("eieb_conversation_history")
-    ) || [];
-  } catch {
+    const savedHistory = localStorage.getItem(
+      "eieb_conversation_history"
+    );
+
+    conversationHistory = savedHistory
+      ? JSON.parse(savedHistory)
+      : [];
+
+    if (!Array.isArray(conversationHistory)) {
+      conversationHistory = [];
+    }
+  } catch (error) {
+    console.error("No se pudo recuperar el historial:", error);
     conversationHistory = [];
   }
 
@@ -539,8 +547,8 @@
 
     const content = document.createElement("span");
     content.innerHTML = escapeHtml(text);
-    bubble.appendChild(content);
 
+    bubble.appendChild(content);
     row.appendChild(bubble);
     chat.appendChild(row);
 
@@ -548,18 +556,27 @@
   }
 
   function restoreConversation() {
-    if (!conversationHistory.length) {
+    if (conversationHistory.length === 0) {
       return;
     }
 
     removeIntro();
 
     conversationHistory.forEach((item) => {
-      addMessage(item.role, item.content);
+      if (
+        item &&
+        (item.role === "user" ||
+          item.role === "assistant") &&
+        typeof item.content === "string"
+      ) {
+        addMessage(item.role, item.content);
+      }
     });
   }
 
   function addTyping() {
+    removeTyping();
+
     const row = document.createElement("div");
     row.className = "message-row teacher";
     row.id = "typingMessage";
@@ -629,6 +646,19 @@
     waiting = true;
     sendButton.disabled = true;
 
+    /*
+      Esta copia contiene únicamente la conversación anterior.
+      Es la que se envía al backend para interpretar frases como:
+      "la tercera", "eso" o "lo anterior".
+    */
+    const historyForRequest =
+      conversationHistory.slice(-10);
+
+    console.log(
+      "Historial enviado al backend:",
+      historyForRequest
+    );
+
     removeIntro();
     addMessage("user", message);
 
@@ -646,7 +676,7 @@
 
         body: JSON.stringify({
           message: message,
-          history: conversationHistory
+          history: historyForRequest
         })
       });
 
@@ -654,7 +684,7 @@
 
       try {
         data = await response.json();
-      } catch {
+      } catch (error) {
         throw new Error(
           "El servidor devolvió una respuesta inválida."
         );
@@ -669,6 +699,14 @@
         );
       }
 
+      const answer =
+        data.answer ||
+        "No pude generar una respuesta en este momento.";
+
+      /*
+        Solamente guardamos el turno cuando el servidor
+        respondió correctamente.
+      */
       conversationHistory.push({
         role: "user",
         content: message
@@ -676,16 +714,17 @@
 
       conversationHistory.push({
         role: "assistant",
-        content: data.answer
+        content: answer
       });
 
       saveHistory();
 
-      addMessage(
-        "assistant",
-        data.answer ||
-        "No pude generar una respuesta."
+      console.log(
+        "Historial actualizado:",
+        conversationHistory
       );
+
+      addMessage("assistant", answer);
     } catch (error) {
       removeTyping();
 
